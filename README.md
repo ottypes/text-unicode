@@ -1,26 +1,19 @@
 # The Plaintext OT Type
 
-**NOTE**: This OT type counts characters using UTF16 offsets instead of
-unicode codepoints. This is slightly faster in javascript, but its
-incompatible with ot implementations in other languages. For future
-projects I recommend that you use [ot-text-
-unicode](https://github.com/ottypes/text-unicode) instead.
-
-
 This OT type can be used to edit plaintext documents, like sourcecode or
 markdown.
 
 This project's [history is here](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee).
 
-For documentation on the spec this type implements, see [ottypes/docs](/ottypes/docs).
+For documentation on the API spec this type implements, see [ottypes/docs](/ottypes/docs).
 
 ## Spec
 
-The plaintext OT type thinks of the document as a giant string, and edits index
-into the string directly. This is different from most text editors, which break
-up a document into an array of lines. For small documents on modern computers,
-the conversion isn't particularly expensive. However, if you have giant
-documents you should be using a rope library like
+The plaintext OT type thinks of the document as a giant unicode string, and
+edits index unicode characters in the string. This is different from most text
+editors, which break up a document into an array of lines. For small documents
+on modern computers, the conversion isn't particularly expensive. However, if
+you have giant documents you should be using a rope library like
 [jumprope](https://github.com/josephg/jumprope) or
 [librope](https://github.com/josephg/librope).
 
@@ -39,7 +32,7 @@ You could apply the operation
 [1, ' hi ', 2, {d:3}]
 ```
 
-This operation will skip the first character, insert ' hi ', skip 2 more
+This operation will skip the first character (1), insert ' hi ', skip 2 more
 characters then delete the next 3 characters. The result would be:
 
 ```
@@ -65,12 +58,21 @@ Selection ranges are either a single number (the cursor position) or a pair of
 [anchor, focus] numbers (aka [start, end]) of the selection range. Be aware
 that end can be before start.
 
+
+# Other implementations
+
+I have compatible implementations of this OT type in:
+
+- [C](https://github.com/share/libot/blob/master/text.h) which is [insanely](h
+ttps://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%201.png) [fast](
+https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png).
+- [Rust](https://github.com/josephg/textot.rs). This code is much less mature, but extremely concise and beautiful.
+
 ---
 
 # Commentary
 
-This is the 3rd iteration of ShareJS's plaintext type. It hasn't been changed
-in a long time now.
+This is the 4th iteration of ShareJS's plaintext type.
 
 The first iteration was similar, except it is invertable. Invertability is
 nice, but I want to eventually build an arbitrary P2P OT system, and in a p2p
@@ -86,18 +88,13 @@ what the current text implementation does. I thought the individual edits style
 was better because I expected it to be simpler, but when I implemented it I
 found the implementation of each method was almost identical in size.
 
-There is also a [C implementation of this
-type](https://github.com/share/libot/blob/master/text.h) which is [insanely](h
-ttps://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%201.png) [fast](
-https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png). The
-implementations are almost the same, except this javascript implemention
-counts characters using 16 bit words and the C implementation counts
-characters using unicode codepoints. If you have any characters in the astral
-plane in your document (like emoji 😅), edit & cursor positions will be
-misaligned between implementations. See [here for more
-information](http://josephg.com/blog/string-length-lies). If you are building
-a cross-platform application, use the newer [ot-text-
-unicode](https://github.com/ottypes/text-unicode) instead.
+The [3rd iteration](https://github.com/ottypes/text) is 99% identical to this
+codebase, except it used UTF16 word offsets instead of unicode codepoints.
+This implementation considers emoji 🤸🏼‍♀️ as 1 character. ottypes/text
+considers that as 2 characters instead, because it takes a pair of UTF16
+values to store (`"🤓".length === 2` in javascript). This makes it awkward to
+build cross-platform OT systems spanning platforms which don't accept use JS's
+awkward unicode encoding.
 
 ---
 
