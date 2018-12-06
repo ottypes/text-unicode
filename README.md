@@ -74,7 +74,7 @@ This is the 4th iteration of ShareJS's plaintext type.
 
 
 The [first
-iteration]((https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee))
+iteration](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee)
 was similar, except it is invertable. Invertability is nice, but I want to
 eventually build an arbitrary P2P OT system, and in a p2p setting
 invertibillity becomes impractical to achieve. I don't want systems to depend
