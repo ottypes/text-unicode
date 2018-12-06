@@ -3,8 +3,6 @@
 This OT type can be used to edit plaintext documents, like sourcecode or
 markdown.
 
-This project's [history is here](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee).
-
 For documentation on the API spec this type implements, see [ottypes/docs](/ottypes/docs).
 
 ## Spec
@@ -74,10 +72,13 @@ https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png).
 
 This is the 4th iteration of ShareJS's plaintext type.
 
-The first iteration was similar, except it is invertable. Invertability is
-nice, but I want to eventually build an arbitrary P2P OT system, and in a p2p
-setting invertibillity becomes impractical to achieve. I don't want systems to
-depend on it.
+
+The [first
+iteration]((https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee))
+was similar, except it is invertable. Invertability is nice, but I want to
+eventually build an arbitrary P2P OT system, and in a p2p setting
+invertibillity becomes impractical to achieve. I don't want systems to depend
+on it.
 
 The second iteration made each component specify a location and an edit there.
 Operations were lists of these edits. Because the components were not sorted,
