@@ -61,9 +61,7 @@ that end can be before start.
 
 I have compatible implementations of this OT type in:
 
-- [C](https://github.com/share/libot/blob/master/text.h) which is [insanely](h
-ttps://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%201.png) [fast](
-https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png).
+- [C](https://github.com/share/libot/blob/master/text.h) which is [insanely](https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%201.png) [fast](https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png).
 - [Rust](https://github.com/josephg/textot.rs). This code is much less mature, but extremely concise and beautiful.
 
 ---
