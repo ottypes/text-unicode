@@ -46,7 +46,7 @@ export interface TextType<R> {
   create(): R
 
   trim(op: TextOp): TextOp
-
+  checkOp(op: TextOp): void
   normalize(op: TextOp): TextOp
   apply(doc: R, op: TextOp): R
   transform(op: TextOp, other: TextOp, side: 'left' | 'right'): TextOp
@@ -98,6 +98,12 @@ const checkOp = (op: TextOp) => {
   if (typeof last === 'number') throw Error('Op has a trailing skip')
 }
 
+const normalize = (op: TextOp) => {
+  const newOp: TextOp = []
+  const append = makeAppend(newOp)
+  for (let i = 0; i < op.length; i++) append(op[i])
+  return trim(newOp)
+}
 
 
 /** Check that the given selection range is valid. */
@@ -217,18 +223,188 @@ const trim = (op: TextOp) => {
 }
 
 
-export default function makeType<Snap>(name: string, uri: string, ropeImpl: Rope<Snap>): TextType<Snap> {
-  return {
-    name,
-    uri,
-    trim,
+/** Transform op by otherOp.
+ *
+ * @param op - The operation to transform
+ * @param otherOp - Operation to transform it by
+ * @param side - Either 'left' or 'right'
+ */
+function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
+  if (side !== 'left' && side !== 'right') {
+    throw Error("side (" + side + ") must be 'left' or 'right'")
+  }
 
-    normalize(op: TextOp) {
-      const newOp: TextOp = []
-      const append = makeAppend(newOp)
-      for (let i = 0; i < op.length; i++) append(op[i])
-      return trim(newOp)
-    },
+  checkOp(op1)
+  checkOp(op2)
+
+  const newOp: TextOp = []
+
+  const append = makeAppend(newOp)
+  const {take, peek} = makeTake(op1)
+
+  for (let i = 0; i < op2.length; i++) {
+    const c2 = op2[i]
+
+    let length, c1
+    switch (typeof c2) {
+      case 'number': // Skip
+        length = c2
+        while (length > 0) {
+          c1 = take(length, 'i')!
+          append(c1)
+          if (typeof c1 !== 'string') {
+            length -= componentLength(c1)
+          }
+        }
+        break
+
+      case 'string': // Insert
+        if (side === 'left') {
+          // The left insert should go first.
+          if (typeof peek() === 'string') {
+            append(take(-1)!)
+          }
+        }
+
+        // Otherwise skip the inserted text.
+        append(strPosToUni(c2))
+        break
+
+      case 'object': // Delete
+        length = c2.d
+        while (length > 0) {
+          c1 = take(length, 'i')!
+          switch (typeof c1) {
+            case 'number':
+              length -= c1
+              break
+            case 'string':
+              append(c1)
+              break
+            case 'object':
+              // The delete is unnecessary now - the text has already been deleted.
+              length -= c1.d
+          }
+        }
+        break
+    }
+  }
+  
+  // Append any extra data in op1.
+  let c
+  while ((c = take(-1))) append(c)
+  
+  return trim(newOp)
+}
+
+/** Compose op1 and op2 together and return the result */
+function compose(op1: TextOp, op2: TextOp) {
+  checkOp(op1)
+  checkOp(op2)
+
+  const result: TextOp = []
+  const append = makeAppend(result)
+  const {take} = makeTake(op1)
+
+  for (let i = 0; i < op2.length; i++) {
+    const component = op2[i]
+    let length, chunk
+    switch (typeof component) {
+      case 'number': // Skip
+        length = component
+        while (length > 0) {
+          chunk = take(length, 'd')!
+          append(chunk)
+          if (typeof chunk !== 'object') {
+            length -= componentLength(chunk)
+          }
+        }
+        break
+
+      case 'string': // Insert
+        append(component)
+        break
+
+      case 'object': // Delete
+        length = component.d
+
+        while (length > 0) {
+          chunk = take(length, 'd')!
+
+          switch (typeof chunk) {
+            case 'number':
+              append({d: chunk})
+              length -= chunk
+              break
+            case 'string':
+              length -= strPosToUni(chunk)
+              break
+            case 'object':
+              append(chunk)
+          }
+        }
+        break
+    }
+  }
+
+  let c
+  while ((c = take(-1))) append(c)
+
+  return trim(result)
+}
+
+// The cursor position (input and output) is always specified in JS string
+// offsets, because thats what the browser JS does for input elements. We
+// need a copy of the doc (BEFORE THE OP WAS APPLIED) to convert the op
+// back to string offsets.
+//
+// TODO: Consider rewriting this to use a rope instead. Its a bit awkward
+// to use like this.
+function transformPosition(cursor: number, doc: string, op: TextOp) {
+  let prePos = 0, postPos = 0 // string index in doc.
+
+  for (let i = 0; i < op.length && cursor > postPos; i++) {
+    const c = op[i]
+
+    // I could actually use the op_iter stuff above - but I think its simpler
+    // like this.
+    switch (typeof c) {
+      case 'number': { // skip
+        const offset = uniToStrPos(doc.slice(prePos), c)
+        prePos += offset
+        postPos += offset
+        break
+      }
+
+      case 'string': // insert
+        // Its safe to use c.length here because they're both utf16 offsets.
+        // Ignoring pos because the doc doesn't know about the insert yet.
+        postPos += c.length
+        cursor += c.length
+        break
+
+      case 'object': // delete
+        cursor -= Math.min(uniToStrPos(doc.slice(prePos), c.d), cursor - postPos)
+        prePos += c.d
+        break
+    }
+  }
+  return cursor
+}
+
+const transformSelection = (selection: number | [number, number], doc: string, op: TextOp): number | [number, number] => (
+  typeof selection === 'number'
+    ? transformPosition(selection, doc, op)
+    : selection.map(s => transformPosition(s, doc, op)) as [number, number]
+)
+
+export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
+  return {
+    name: 'text-unicode',
+    uri: 'http://sharejs.org/types/text-unicode',
+    trim,
+    normalize,
+    checkOp,
 
     /** Create a new text snapshot.
      *
@@ -262,177 +438,9 @@ export default function makeType<Snap>(name: string, uri: string, ropeImpl: Rope
       return builder.build()
     },
 
-
-    /** Transform op by otherOp.
-     *
-     * @param op - The operation to transform
-     * @param otherOp - Operation to transform it by
-     * @param side - Either 'left' or 'right'
-     */
-    transform(op1, op2, side) {
-      if (side !== 'left' && side !== 'right') {
-        throw Error("side (" + side + ") must be 'left' or 'right'")
-      }
-
-      checkOp(op1)
-      checkOp(op2)
-
-      const newOp: TextOp = []
-
-      const append = makeAppend(newOp)
-      const {take, peek} = makeTake(op1)
-
-      for (let i = 0; i < op2.length; i++) {
-        const c2 = op2[i]
-
-        let length, c1
-        switch (typeof c2) {
-          case 'number': // Skip
-            length = c2
-            while (length > 0) {
-              c1 = take(length, 'i')!
-              append(c1)
-              if (typeof c1 !== 'string') {
-                length -= componentLength(c1)
-              }
-            }
-            break
-
-          case 'string': // Insert
-            if (side === 'left') {
-              // The left insert should go first.
-              if (typeof peek() === 'string') {
-                append(take(-1)!)
-              }
-            }
-
-            // Otherwise skip the inserted text.
-            append(strPosToUni(c2))
-            break
-
-          case 'object': // Delete
-            length = c2.d
-            while (length > 0) {
-              c1 = take(length, 'i')!
-              switch (typeof c1) {
-                case 'number':
-                  length -= c1
-                  break
-                case 'string':
-                  append(c1)
-                  break
-                case 'object':
-                  // The delete is unnecessary now - the text has already been deleted.
-                  length -= c1.d
-              }
-            }
-            break
-        }
-      }
-      
-      // Append any extra data in op1.
-      let c
-      while ((c = take(-1))) append(c)
-      
-      return trim(newOp)
-    },
-
-    /** Compose op1 and op2 together and return the result */
-    compose(op1, op2) {
-      checkOp(op1)
-      checkOp(op2)
-
-      const result: TextOp = []
-      const append = makeAppend(result)
-      const {take} = makeTake(op1)
-
-      for (let i = 0; i < op2.length; i++) {
-        const component = op2[i]
-        let length, chunk
-        switch (typeof component) {
-          case 'number': // Skip
-            length = component
-            while (length > 0) {
-              chunk = take(length, 'd')!
-              append(chunk)
-              if (typeof chunk !== 'object') {
-                length -= componentLength(chunk)
-              }
-            }
-            break
-
-          case 'string': // Insert
-            append(component)
-            break
-
-          case 'object': // Delete
-            length = component.d
-
-            while (length > 0) {
-              chunk = take(length, 'd')!
-
-              switch (typeof chunk) {
-                case 'number':
-                  append({d: chunk})
-                  length -= chunk
-                  break
-                case 'string':
-                  length -= strPosToUni(chunk)
-                  break
-                case 'object':
-                  append(chunk)
-              }
-            }
-            break
-        }
-      }
-
-      let c
-      while ((c = take(-1))) append(c)
-
-      return trim(result)
-    },
-
-    // The cursor position (input and output) is always specified in JS string
-    // offsets, because thats what the browser JS does for input elements. We
-    // need a copy of the doc (after the op was applied) to convert the op
-    // back to string offsets.
-    //
-    // TODO: Consider rewriting this to use a rope instead. Its a bit awkward
-    // to use like this.
-    transformPosition(cursor: number, doc: string, op: TextOp) {
-      let pos = 0 // string index in doc.
-
-      for (let i = 0; i < op.length && cursor > pos; i++) {
-        const c = op[i]
-
-        // I could actually use the op_iter stuff above - but I think its simpler
-        // like this.
-        switch (typeof c) {
-          case 'number': { // skip
-            const p2 = pos + uniToStrPos(doc.slice(pos), c)
-            if (cursor <= p2) return cursor
-            pos = p2
-            break
-          }
-          case 'string': // insert
-            // Its safe to use c.length here because they're both utf16 offsets.
-            pos += c.length
-            cursor += c.length
-            break
-
-          case 'object': // delete
-            cursor -= Math.min(uniToStrPos(doc.slice(pos), c.d), cursor - pos)
-            break
-        }
-      }
-      return cursor
-    },
-
-    transformSelection(selection: number | [number, number], doc: string, op: TextOp): number | [number, number] {
-      return typeof selection === 'number'
-        ? this.transformPosition(selection, doc, op)
-        : selection.map(s => this.transformPosition(s, doc, op)) as [number, number]
-    },
+    transform,
+    compose,
+    transformPosition,
+    transformSelection,
   }
 }

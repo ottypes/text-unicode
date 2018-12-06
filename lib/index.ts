@@ -30,7 +30,7 @@ const ropeImplUnicodeString: Rope<string> = {
   }
 }
 
-const textString = makeType('text-unicode', 'http://sharejs.org/types/text-unicode', ropeImplUnicodeString)
+const textString = makeType(ropeImplUnicodeString)
 
 const type = {
   ...textString,
