@@ -69,7 +69,7 @@ module.exports = (type, genOp) -> describe "text api for '#{type.name}'", ->
       assert.strictEqual @ctx.get(), content
       assert.strictEqual @ctx.getLength(), content.length
 
-  it 'emits events correctly', ->
+  it.skip 'emits events correctly', ->
     contents = ''
 
     @ctx.onInsert = (pos, text) ->

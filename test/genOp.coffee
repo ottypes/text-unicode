@@ -1,21 +1,42 @@
-
 {randomInt, randomWord} = require 'ot-fuzzer'
-{type} = require '../lib'
+{type} = require '../dist'
+
+emoji = '😅🤖👻🤟💃'
+
+strToList = (s) ->
+  list = []
+  i = 0
+  while i < s.length
+    code = s.charCodeAt i
+    if code >= 0xd800
+      list.push s[i] + s[i+1]
+      i += 2
+    else
+      list.push s[i++]
+
+  list
+
 
 module.exports = genOp = (docStr) ->
-  initial = docStr
+  docStr = strToList docStr
+  initialLen = docStr.length
 
   op = []
   expectedDoc = ''
 
   consume = (len) ->
-    expectedDoc += docStr[...len]
+    expectedDoc += docStr[...len].join('')
     docStr = docStr[len..]
 
   addInsert = ->
     # Insert a random word from the list somewhere in the document
     skip = randomInt Math.min docStr.length, 5
-    word = randomWord() + ' '
+
+    if randomInt(2)
+      word = randomWord() + ' '
+    else
+      p = randomInt(emoji.length/2)
+      word = emoji.slice(p*2, p*2 + 2)
 
     op.push skip
     consume skip
@@ -35,7 +56,7 @@ module.exports = genOp = (docStr) ->
 
   while docStr.length > 0
     # If the document is long, we'll bias it toward deletes
-    chance = if initial.length > 100 then 3 else 2
+    chance = if initialLen > 100 then 3 else 2
     switch randomInt(chance)
       when 0 then addInsert()
       when 1, 2 then addDelete()
@@ -47,7 +68,8 @@ module.exports = genOp = (docStr) ->
   # sometimes.
   addInsert() if randomInt(10) == 0
 
-  expectedDoc += docStr
+  expectedDoc += docStr.join ''
   [type.normalize(op), expectedDoc]
  
 
+# console.log genOp emoji for [1..10]

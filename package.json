@@ -2,18 +2,21 @@
   "name": "ot-text",
   "version": "1.0.1",
   "description": "OT type for plaintext",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "directories": {
     "test": "test"
   },
   "dependencies": {},
   "devDependencies": {
     "coffeescript": "^2.3.2",
-    "mocha": "5",
-    "ot-fuzzer": "~1.0.0"
+    "mocha": "^5",
+    "ot-fuzzer": "~1.0.0",
+    "typescript": "^3.2.1"
   },
   "scripts": {
-    "test": "mocha test/*.coffee"
+    "test": "mocha test/*.coffee",
+    "prepare": "tsc"
   },
   "repository": {
     "type": "git",

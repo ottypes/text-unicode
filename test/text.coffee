@@ -4,7 +4,7 @@ fs = require 'fs'
 assert = require 'assert'
 
 fuzzer = require 'ot-fuzzer'
-type = require('../lib').type
+type = require('../dist').type
 genOp = require './genOp'
 
 readOp = (file) ->
@@ -17,6 +17,12 @@ readOp = (file) ->
       {d:c.d.length}
 
   type.normalize op
+
+compose = (op1, op2, expect) -> assert.deepEqual type.compose(op1, op2), expect
+transform = (op1, op2, expectLeft, expectRight) ->
+  expectRight = if expectRight != undefined then expectRight else expectLeft
+  assert.deepEqual type.transform(op1, op2, 'left'), expectLeft
+  assert.deepEqual type.transform(op1, op2, 'right'), expectRight
 
 
 describe 'text', ->
@@ -72,90 +78,65 @@ describe 'text', ->
     assert.deepEqual ['ab'], type.normalize [0, 'a', 0, 'b', 0]
     assert.deepEqual ['a', 1, 'b'], type.normalize ['a', 1, 'b']
 
-  describe '#selectionEq', ->
-    it 'just does equality on plain numbers', ->
-      assert type.selectionEq 5, 5
-      assert type.selectionEq 0, 0
-      assert.equal false, type.selectionEq 0, 1
-      assert.equal false, type.selectionEq 5, 1
+  describe 'emoji', ->    
+    it 'compose insert', ->
+      compose ['👻'], [1, '🥰'], ['👻🥰']
 
-    it 'compares pairs correctly', ->
-      assert type.selectionEq [1,2], [1,2]
-      assert type.selectionEq [2,2], [2,2]
-      assert type.selectionEq [0,0], [0,0]
-      assert type.selectionEq [0,1], [0,1]
-      assert type.selectionEq [1,0], [1,0]
+    it 'compose delete', ->
+      compose [1, 'a👻b'], [2, d:1], [1, 'ab']
+      compose [1, 'a👻b'], [3, d:1], [1, 'a👻']
 
-      assert.equal false, type.selectionEq [1,2], [1,0]
-      assert.equal false, type.selectionEq [0,2], [0,1]
-      assert.equal false, type.selectionEq [1,0], [5,0]
-      assert.equal false, type.selectionEq [1,1], [5,5]
+    it 'transform', ->
+      transform ['👻'], ['🥰'], ['👻'], [1, '👻']
 
-    it 'works with array vs number', ->
-      assert type.selectionEq 0, [0,0]
-      assert type.selectionEq 1, [1,1]
-      assert type.selectionEq [0,0], 0
-      assert type.selectionEq [1,1], 1
-
-      assert.equal false, type.selectionEq 1, [1,0]
-      assert.equal false, type.selectionEq 0, [0,1]
-      assert.equal false, type.selectionEq [1,2], 1
-      assert.equal false, type.selectionEq [0,2], 0
+  describe 'fuzzer found bugs', ->
+    it 'compose does not consume too many items', ->
+      compose ['👻🥰💃'], [1, d:1], ['👻💃']
 
   describe '#transformSelection()', ->
     # This test was copied from https://github.com/josephg/libot/blob/master/test.c
+    # 
+    # TODO: Add unicode tests here.
+    doc = "abcdefghijklmnopqrstuvwxyz1234abcdefghijklmnopqrstuvwxyz1234"
     ins = [10, "oh hi"]
     del = [25, {d:20}]
     op = [10, 'oh hi', 10, {d:20}] # The previous ops composed together
 
-    tc = (op, isOwn, cursor, expected) ->
-      assert type.selectionEq expected, type.transformSelection cursor, op, isOwn
-      assert type.selectionEq expected, type.transformSelection [cursor, cursor], op, isOwn
+    tc = (op, cursor, expected) ->
+      assert.strictEqual type.transformSelection(cursor, doc, op), expected
+      assert.deepStrictEqual type.transformSelection([cursor, cursor], doc, op), [expected, expected]
  
     it "shouldn't move a cursor at the start of the inserted text", ->
-      tc op, false, 10, 10
-  
-    it "move a cursor at the start of the inserted text if its yours", ->
-      tc ins, true, 10, 15
+      tc op, 10, 10
   
     it 'should move a character inside a deleted region to the start of the region', ->
-      tc del, false, 25, 25
-      tc del, false, 35, 25
-      tc del, false, 45, 25
-
-      tc del, true, 25, 25
-      tc del, true, 35, 25
-      tc del, true, 45, 25
+      tc del, 25, 25
+      tc del, 35, 25
+      tc del, 45, 25
   
     it "shouldn't effect cursors before the deleted region", ->
-      tc del, false, 10, 10
+      tc del, 10, 10
   
     it "pulls back cursors past the end of the deleted region", ->
-      tc del, false, 55, 35
+      tc del, 55, 35
   
-    it "teleports your cursor to the end of the last insert or the delete", ->
-      tc ins, true, 0, 15
-      tc ins, true, 100, 15
-      tc del, true, 0, 25
-      tc del, true, 100, 25
-
     it "works with more complicated ops", ->
-      tc op, false, 0, 0
-      tc op, false, 100, 85
-      tc op, false, 10, 10
-      tc op, false, 11, 16
+      tc op, 0, 0
+      tc op, 100, 85
+      tc op, 10, 10
+      tc op, 11, 16
   
-      tc op, false, 20, 25
-      tc op, false, 30, 25
-      tc op, false, 40, 25
-      tc op, false, 41, 26
+      tc op, 20, 25
+      tc op, 30, 25
+      tc op, 40, 25
+      tc op, 41, 26
 
 
   describe 'randomizer', -> it 'passes', ->
-    @timeout 10000
-    @slow 1500
+    @timeout 100000
+    @slow 5000
 
-    fuzzer type, genOp
+    fuzzer type, genOp, 10000
 
 # And test the API.
 require('./api') type, genOp

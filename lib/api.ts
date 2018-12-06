@@ -16,9 +16,10 @@
 // A user can define:
 // - onInsert(pos, text): Called when text is inserted.
 // - onRemove(pos, length): Called when text is removed.
+import {TextOp} from './maketext'
+import {strPosToUni} from './unicode'
 
-module.exports = api;
-function api(getSnapshot, submitOp) {
+export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb: () => {}) => void) {
   return {
     // Returns the text content of the document
     get: getSnapshot,
@@ -27,12 +28,14 @@ function api(getSnapshot, submitOp) {
     getLength() { return getSnapshot().length },
 
     // Insert the specified text at the given position in the document
-    insert(pos, text, callback) {
-      return submitOp([pos, text], callback)
+    insert(pos: number, text: string, callback: () => {}) {
+      const uniPos = strPosToUni(getSnapshot(), pos)
+      return submitOp([uniPos, text], callback)
     },
 
-    remove(pos, length, callback) {
-      return submitOp([pos, {d:length}], callback)
+    remove(pos: number, length: number, callback: () => {}) {
+      const uniPos = strPosToUni(getSnapshot(), pos)
+      return submitOp([uniPos, {d:length}], callback)
     },
 
     // When you use this API, you should implement these two methods
@@ -40,7 +43,7 @@ function api(getSnapshot, submitOp) {
     //onInsert: function(pos, text) {},
     //onRemove: function(pos, removedLength) {},
 
-    _onOp(op) {
+    _onOp(op: TextOp) {
       var pos = 0
       var spos = 0
       for (var i = 0; i < op.length; i++) {
@@ -59,7 +62,10 @@ function api(getSnapshot, submitOp) {
             spos += component.d
         }
       }
-    }
+    },
+
+    onInsert: null as null | ((pos: number, s: string) => void),
+    onRemove: null as null | ((pos: number, amt: number) => void),
   }
 }
 api.provides = {text: true}
