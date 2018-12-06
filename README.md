@@ -1,9 +1,89 @@
-# The Plaintext OT Type
+# The Plaintext OT Type, with proper unicode positions
 
 This OT type can be used to edit plaintext documents, like sourcecode or
 markdown.
 
 For documentation on the API spec this type implements, see [ottypes/docs](/ottypes/docs).
+
+## Usage
+
+```
+# npm add ot-text-unicode
+```
+
+then use it like any other OT type:
+
+```javascript
+const {type} = require('ot-text-unicode')
+
+type.apply('hi there', [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
+```
+
+### Using a rope with text-ot
+
+This library has also been extended to allow you to specify your own fancy rope type, and apply operations efficiently. Neato 🌯! To use it, you'll need to implement your own rope type:
+
+```javascript
+const myRopeFns = {
+  create(str) { return new Rope(str) },
+  toString(rope) { return rope.toString() },
+
+  builder(rope) {
+    // Used for applying operations
+    let pos = 0 // character position in unicode code points
+
+    return {
+      skip(n) { pos += n },
+
+      append(s) { // Insert s at the current position
+        rope.insert(pos, s)
+        pos += unicodeLength(s)
+      },
+
+      del(n) { // Delete n characters at the current position
+        rope.del(pos, n)
+      },
+
+      build() { // Finish!
+        return rope
+      },
+    }
+  }
+}
+```
+
+Then use it:
+
+```javascript
+const type = require('ot-text-unicode').makeType(myRopeFns)
+
+let doc = type.create('hi there')
+doc = type.apply(doc, [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
+
+// If your rope functions modify doc in-place, so will apply.
+```
+
+
+### Transforming cursor positions
+
+If you have another user's cursor position, you can transform that cursor using `type.transformPosition` or `type.transformSelection`:
+
+```javascript
+const {type} = require('ot-text-unicode')
+let doc = '...'
+let cursors = [{user: 'jane', pos: 5}, {user: 'fred', pos: 100}]
+
+function onRemoteOp(op) {
+  for (let user of cursors) {
+    // Update user positions based on operation. doc must be the document as a
+    // string *before* the operation has been applied!
+    user.pos = type.transformPosition(user.pos, doc, op)
+  }
+
+  doc = type.apply(doc, op)
+}
+```
+
 
 ## Spec
 
