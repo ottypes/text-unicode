@@ -61,8 +61,8 @@ that end can be before start.
 
 I have compatible implementations of this OT type in:
 
-- [C](https://github.com/share/libot/blob/master/text.h) which is [insanely](https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%201.png) [fast](https://dl.dropboxusercontent.com/u/2494815/ot%20apply%20bench%202.png).
-- [Rust](https://github.com/josephg/textot.rs). This code is much less mature, but extremely concise and beautiful.
+- [C](https://github.com/share/libot/blob/master/text.h). This implementation is insanely fast (~20M transforms / second on my old laptop, not that that will ever be a bottleneck.)
+- [Rust](https://github.com/josephg/textot.rs). This code is much less mature, but far more concise and beautiful than the C or JS implementations.
 
 ---
 
