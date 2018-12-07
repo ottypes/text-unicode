@@ -10,6 +10,7 @@ const ropeImplUnicodeString: Rope<string> = {
   toString(s) { return s },
 
   builder(oldDoc) {
+    if (typeof oldDoc !== 'string') throw Error('Invalid document snapshot: ' + oldDoc)
     const newDoc: string[] = []
 
     return {
