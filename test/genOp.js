@@ -75,7 +75,7 @@ module.exports = function genOp(docStr) {
 
   // The code above will never insert at the end of the document. Its important to do that
   // sometimes.
-  if (randomInt(10) === 0) addInsert()
+  if (randomInt(docStr.length === 0 ? 2 : 10) === 0) addInsert()
 
   expectedDoc += docStr.join('')
   return [type.normalize(op), expectedDoc]
