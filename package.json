@@ -1,6 +1,6 @@
 {
   "name": "ot-text-unicode",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "OT type for plaintext",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
