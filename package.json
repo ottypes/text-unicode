@@ -9,13 +9,12 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "coffeescript": "^2.3.2",
     "mocha": "^5",
     "ot-fuzzer": "~1.0.0",
     "typescript": "^3.2.1"
   },
   "scripts": {
-    "test": "mocha test/*.coffee",
+    "test": "mocha test/*.js",
     "prepare": "tsc"
   },
   "repository": {
@@ -23,7 +22,8 @@
     "url": "https://github.com/ottypes/text.git"
   },
   "files": [
-    "dist/"
+    "dist/",
+    "test/genOp.js"
   ],
   "keywords": [
     "ot",
