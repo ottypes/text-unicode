@@ -400,7 +400,7 @@ const transformSelection = (selection: number | [number, number], doc: string, o
 
 export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
   return {
-    name: 'text_unicode',
+    name: 'text-unicode',
     uri: 'http://sharejs.org/types/text-unicode',
     trim,
     normalize,
