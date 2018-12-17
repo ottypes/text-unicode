@@ -2,13 +2,11 @@
 // testing text OT implementations in other languages without needing to port
 // the test suite.
 
-require('coffeescript/register')
-
 const fs = require('fs')
 const assert = require('assert')
 
 const fuzzer = require('ot-fuzzer')
-const type = require('../lib').type
+const type = require('../dist').type
 const genOp = require('../test/genOp')
 
 if (require.main === module) {

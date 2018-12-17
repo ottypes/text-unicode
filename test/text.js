@@ -150,13 +150,16 @@ describe('text', () => {
     it("works with more complicated ops", () => {
       tc(op, 0, 0)
       tc(op, 100, 85)
-      tc(op, 10, 10)
       tc(op, 11, 16)
   
       tc(op, 20, 25)
       tc(op, 30, 25)
       tc(op, 40, 25)
       tc(op, 41, 26)
+    })
+
+    it('considers an insert at the current position to be after the current cursor position', () => {
+      tc(op, 10, 10)
     })
   })
 
