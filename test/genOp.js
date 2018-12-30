@@ -37,7 +37,7 @@ module.exports = function genOp(docStr) {
     let word
     const skip = randomInt(Math.min(docStr.length, 5))
 
-    if (randomInt(2)) {
+    if (randomInt(5)) { // Usually just use normal ascii characters
       word = randomWord() + ' '
     } else {
       const p = randomInt(emoji.length/2)

@@ -68,4 +68,8 @@ export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb
     onRemove: null as null | ((pos: number, amt: number) => void),
   }
 }
-api.provides = {text: true}
+
+// This triggers a bug in the typescript compiler, where it generates an
+// invalid typescript declaration file.
+//api.provides = {text: true}
+;(api as any).provides = {text: true}
