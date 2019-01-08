@@ -51,9 +51,8 @@ export interface TextType<R> {
   apply(doc: R, op: TextOp): R
   transform(op: TextOp, other: TextOp, side: 'left' | 'right'): TextOp
   compose(a: TextOp, b: TextOp): TextOp
-
-  transformPosition(cursor: number, doc: string, op: TextOp): number
-  transformSelection(selection: number | [number, number], doc: string, op: TextOp): number | [number, number]
+  transformPosition(cursor: number, op: TextOp): number
+  transformSelection(selection: number | [number, number], op: TextOp): number | [number, number]
 }
 
 export interface Rope<Snap> {
@@ -353,50 +352,44 @@ function compose(op1: TextOp, op2: TextOp) {
   return trim(result)
 }
 
-// The cursor position (input and output) is always specified in JS string
-// offsets, because thats what the browser JS does for input elements. We
-// need a copy of the doc (BEFORE THE OP WAS APPLIED) to convert the op
-// back to string offsets.
-//
-// TODO: Consider rewriting this to use a rope instead. Its a bit awkward
-// to use like this.
-function transformPosition(cursor: number, doc: string, op: TextOp) {
-  let prePos = 0, postPos = 0 // string index in doc.
+// This operates in unicode offsets to make it consistent with the equivalent
+// methods in other languages / systems.
+const transformPosition = (cursor: number, op: TextOp) => {
+  let pos = 0
 
-  for (let i = 0; i < op.length && cursor > postPos; i++) {
+  for (let i = 0; i < op.length && cursor > pos; i++) {
     const c = op[i]
 
     // I could actually use the op_iter stuff above - but I think its simpler
     // like this.
     switch (typeof c) {
       case 'number': { // skip
-        const offset = uniToStrPos(doc.slice(prePos), c)
-        prePos += offset
-        postPos += offset
+        pos += c
         break
       }
 
       case 'string': // insert
         // Its safe to use c.length here because they're both utf16 offsets.
         // Ignoring pos because the doc doesn't know about the insert yet.
-        postPos += c.length
-        cursor += c.length
+        const offset = strPosToUni(c)
+        pos += offset
+        cursor += offset
         break
 
       case 'object': // delete
-        cursor -= Math.min(uniToStrPos(doc.slice(prePos), c.d), cursor - postPos)
-        prePos += c.d
+        cursor -= Math.min(c.d, cursor - pos)
         break
     }
   }
   return cursor
 }
 
-const transformSelection = (selection: number | [number, number], doc: string, op: TextOp): number | [number, number] => (
+const transformSelection = (selection: number | [number, number], op: TextOp): number | [number, number] => (
   typeof selection === 'number'
-    ? transformPosition(selection, doc, op)
-    : selection.map(s => transformPosition(s, doc, op)) as [number, number]
+    ? transformPosition(selection, op)
+    : selection.map(s => transformPosition(s, op)) as [number, number]
 )
+
 
 export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
   return {
@@ -440,6 +433,7 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
 
     transform,
     compose,
+    
     transformPosition,
     transformSelection,
   }

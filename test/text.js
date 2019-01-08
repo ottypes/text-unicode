@@ -3,6 +3,7 @@ const assert = require('assert')
 
 const fuzzer = require('ot-fuzzer')
 const { type } = require('../dist')
+// const { type } = require('../lib')
 const genOp = require('./genOp')
 
 const readOp = function(file) {
@@ -121,7 +122,7 @@ describe('text', () => {
     })
   )
 
-  describe('#transformSelection()', () => {
+  describe('#transformPosition()', () => {
     // This test was copied from https://github.com/josephg/libot/blob/master/test.c
     // 
     // TODO: Add unicode tests here.
@@ -131,8 +132,8 @@ describe('text', () => {
     const op = [10, 'oh hi', 10, {d:20}] // The previous ops composed together
 
     const tc = (op, cursor, expected) => {
-      assert.strictEqual(type.transformSelection(cursor, doc, op), expected)
-      assert.deepStrictEqual(type.transformSelection([cursor, cursor], doc, op), [expected, expected])
+      assert.strictEqual(type.transformPosition(cursor, op), expected)
+      assert.deepStrictEqual(type.transformSelection([cursor, cursor], op), [expected, expected])
     }
  
     it("shouldn't move a cursor at the start of the inserted text", () => tc(op, 10, 10))
@@ -160,6 +161,11 @@ describe('text', () => {
 
     it('considers an insert at the current position to be after the current cursor position', () => {
       tc(op, 10, 10)
+    })
+
+    it('handles unicode inserts correctly', () => {
+      tc(['👻🥰💃'], 1, 4)
+      tc([2, '👻🥰💃'], 1, 1)
     })
   })
 
