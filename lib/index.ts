@@ -1,7 +1,7 @@
 // This is an implementation of the text OT type built on top of JS strings.
 // You would think this would be horribly inefficient, but its surpringly
 // good. JS strings are magic.
-import {strPosToUni, uniToStrPos} from './unicode'
+import {strPosToUni, uniToStrPos} from 'unicount'
 import makeType, {Rope} from './maketext'
 import api from './api'
 

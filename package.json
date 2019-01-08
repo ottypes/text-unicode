@@ -7,7 +7,9 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {},
+  "dependencies": {
+    "unicount": "^1.0.0"
+  },
   "devDependencies": {
     "mocha": "^5",
     "ot-fuzzer": "~1.0.0",

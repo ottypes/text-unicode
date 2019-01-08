@@ -17,7 +17,7 @@
 // - onInsert(pos, text): Called when text is inserted.
 // - onRemove(pos, length): Called when text is removed.
 import {TextOp} from './maketext'
-import {strPosToUni} from './unicode'
+import {strPosToUni} from 'unicount'
 
 export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb: () => {}) => void) {
   return {

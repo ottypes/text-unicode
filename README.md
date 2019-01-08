@@ -75,14 +75,18 @@ let cursors = [{user: 'jane', pos: 5}, {user: 'fred', pos: 100}]
 
 function onRemoteOp(op) {
   for (let user of cursors) {
-    // Update user positions based on operation. doc must be the document as a
-    // string *before* the operation has been applied!
-    user.pos = type.transformPosition(user.pos, doc, op)
+    // Update user positions based on the incoming operation
+    user.pos = type.transformPosition(user.pos, op)
   }
 
   doc = type.apply(doc, op)
 }
 ```
+
+**Note** For consistency, just like other methods, `transformPosition` operates on unicode cursor positions, not raw JS string positions. If you're using this with JS string positions, you have two options:
+
+1. (Recommended) Convert your positions to unicode codepoint positions before calling `transformPosition`. The simplest way is to call `cursor = require('unicount').strPosToUni(doc_contents, jsPosition)`.
+2. Use the older version of `transformPosition` which operates on raw JS offsets. [Code to do that is in this github gist](https://gist.github.com/josephg/cc0a125a2d6a7637dabc79a865a7483c).
 
 
 ## Spec

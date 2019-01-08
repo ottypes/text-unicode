@@ -34,7 +34,7 @@
  * snapshots that are configurable.
  */
 
-import {strPosToUni, uniToStrPos} from './unicode'
+import {strPosToUni, uniToStrPos} from 'unicount'
 
 export type TextOpComponent = number | string | {d: number}
 export type TextOp = TextOpComponent[]
@@ -433,7 +433,7 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
 
     transform,
     compose,
-    
+
     transformPosition,
     transformSelection,
   }
