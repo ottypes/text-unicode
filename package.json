@@ -11,7 +11,7 @@
     "unicount": "^1.0.0"
   },
   "devDependencies": {
-    "mocha": "^5",
+    "mocha": "^7.1.2",
     "ot-fuzzer": "~1.0.0",
     "typescript": "^3.2.1"
   },
