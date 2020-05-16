@@ -654,7 +654,7 @@ typescript@^3.2.1:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.9.2.tgz#64e9c8e9be6ea583c54607677dd4680a1cf35db9"
   integrity sha512-q2ktq4n/uLuNNShyayit+DTobV2ApPEo/6so68JaD5ojvc/6GClBipedB9zNWYxRSAlZXAe405Rlijzl6qDiSw==
 
-unicount@^1.0.0:
+unicount@1.1:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/unicount/-/unicount-1.1.0.tgz#396a3df661c19675a93861ac878c2c9c0042abf0"
   integrity sha512-RlwWt1ywVW4WErPGAVHw/rIuJ2+MxvTME0siJ6lk9zBhpDfExDbspe6SRlWT3qU6AucNjotPl9qAJRVjP7guCQ==
