@@ -38,5 +38,5 @@ const type = {
   api,
 }
 
-export {default as makeType, TextOp, TextType, Rope} from './maketext'
+export {default as makeType, TextOp, TextOpComponent, TextType, Rope} from './maketext'
 export {type}
