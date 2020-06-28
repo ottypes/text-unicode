@@ -2,7 +2,7 @@
 // You would think this would be horribly inefficient, but its surpringly
 // good. JS strings are magic.
 import {strPosToUni, uniToStrPos} from 'unicount'
-import makeType, {Rope} from './type'
+import makeType, {Rope, uniSlice} from './type'
 import api from './api'
 
 const ropeImplUnicodeString: Rope<string> = {
@@ -28,7 +28,9 @@ const ropeImplUnicodeString: Rope<string> = {
       },
       build() { return newDoc.join('') + oldDoc },
     }
-  }
+  },
+
+  slice: uniSlice,
 }
 
 const textString = makeType(ropeImplUnicodeString)

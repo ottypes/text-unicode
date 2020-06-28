@@ -57,6 +57,10 @@ export interface TextType<R> {
   compose(a: TextOp, b: TextOp): TextOp
   transformPosition(cursor: number, op: TextOp): number
   transformSelection(selection: number | [number, number], op: TextOp): number | [number, number]
+
+  invert?(op: TextOp): TextOp
+
+  [k: string]: any
 }
 
 export interface Rope<Snap> {
@@ -73,7 +77,7 @@ export interface Rope<Snap> {
     build(): Snap
   }
   /** Equivalent to String.slice in javascript, but using UTF8 offsets. */
-  // sliceUTF8(doc: Snap, start: number, end: number): Snap
+  slice(doc: Snap, start: number, end?: number): string
 }
 
 
@@ -162,7 +166,7 @@ const componentLength = (c: TextOpComponent): number => (
 )
 
 // Does not support negative numbers.
-const uniSlice = (s: string, startUni: number, endUni?: number) => {
+export const uniSlice = (s: string, startUni: number, endUni?: number) => {
   const start = uniToStrPos(s, startUni)
   const end = endUni == null ? Infinity : uniToStrPos(s, endUni)
   return s.slice(start, end)
@@ -434,38 +438,60 @@ const transformSelection = (selection: number | [number, number], op: TextOp): n
     : selection.map(s => transformPosition(s, op)) as [number, number]
 )
 
-// function invertWithCtx<S, R extends Rope<S>>(op: TextOp, doc: S, ropeImpl: R, preserveInvertData = false) {
-//   // Walk over the rope, turning each insert into an equivalent delete and each
-//   // delete into the equivalent insert based on the contents of the document.
 
-//   const newOp: TextOp = []
-//   let pos = 0 // Position in original document (pre apply).
-//   const append = makeAppend(newOp)
-//   for (let i = 0; i < op.length; i++) {
-//     const c = op[i]
-//     switch (typeof c) {
-//       case 'object': // Delete
-//         if (typeof c.d === 'string') {
-//           append(c.d) // The operation contains information to invert inline.
-//           pos += c.d.length
-//         } else {
-//           append(ropeImpl.toString(ropeImpl.sliceUTF8(doc, pos, pos + c.d)))
-//           pos += c.d
-//         }
-//         break
+function mapOp(op: TextOp, fn: (c: TextOpComponent, prePos: number, postPos: number) => TextOpComponent): TextOp {
+  const newOp: TextOp = []
+  const append = makeAppend(newOp)
+  let prePos = 0, postPos = 0
 
-//       case 'string': // Insert
-//         append({d: preserveInvertData ? c : c.length})
-//         break
+  for (let i = 0; i < op.length; i++) {
+    const c = op[i]
+    append(fn(c, prePos, postPos))
+    switch (typeof c) {
+      case 'object': // Delete
+        prePos += dlen(c.d)
+        break
+
+      case 'string': // Insert
+        postPos += strPosToUni(c)
+        break
         
-//       case 'number': // Skip
-//         append(c)
-//         pos += c
-//         break
-//     }
-//   }
-//   return trim(newOp)
-// }
+      case 'number': // Skip
+        prePos += c
+        postPos += c
+        break
+    }
+  }
+  return trim(newOp)
+}
+
+function makeInvertible<S, R extends Rope<S>>(op: TextOp, doc: S, ropeImpl: R) {
+  return mapOp(op, (c, prePos) => {
+    switch (typeof c) {
+      case 'object': // Delete
+        if (typeof c.d === 'number') {
+          return {d: ropeImpl.slice(doc, prePos, prePos + c.d)}
+        } else return c
+
+      case 'string': // Insert and skip
+      case 'number': return c
+    }
+  })
+}
+
+function invert(op: TextOp) {
+  return mapOp(op, c => {
+    switch (typeof c) {
+      case 'object': // Delete
+        if (typeof c.d === 'number') {
+          throw Error('Cannot invert text op: Deleted characters missing from operation. makeInvertible must be called first.')
+        } else return c.d // delete -> insert
+
+      case 'string': return {d: c} // Insert -> delete
+      case 'number': return c // skip -> skip
+    }
+  })
+}
 
 
 export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
@@ -513,5 +539,9 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
 
     transformPosition,
     transformSelection,
+
+    invert,
+    makeInvertible(op: TextOp, doc: Snap) { return makeInvertible(op, doc, ropeImpl) },
+    invertWithDoc(op: TextOp, doc: Snap) { return invert(makeInvertible(op, doc, ropeImpl)) },
   }
 }
