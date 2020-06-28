@@ -467,15 +467,9 @@ function mapOp(op: TextOp, fn: (c: TextOpComponent, prePos: number, postPos: num
 
 function makeInvertible<S, R extends Rope<S>>(op: TextOp, doc: S, ropeImpl: R) {
   return mapOp(op, (c, prePos) => {
-    switch (typeof c) {
-      case 'object': // Delete
-        if (typeof c.d === 'number') {
-          return {d: ropeImpl.slice(doc, prePos, prePos + c.d)}
-        } else return c
-
-      case 'string': // Insert and skip
-      case 'number': return c
-    }
+    if (typeof c === 'object' && typeof c.d === 'number') { // Delete
+      return {d: ropeImpl.slice(doc, prePos, prePos + c.d)}
+    } else return c
   })
 }
 
@@ -490,6 +484,14 @@ function invert(op: TextOp) {
       case 'string': return {d: c} // Insert -> delete
       case 'number': return c // skip -> skip
     }
+  })
+}
+
+function stripInvertible(op: TextOp) {
+  return mapOp(op, c => {
+    if (typeof c === 'object' && typeof c.d === 'string') {
+      return {d: strPosToUni(c.d)}
+    } else return c
   })
 }
 
@@ -540,8 +542,10 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
     transformPosition,
     transformSelection,
 
-    invert,
     makeInvertible(op: TextOp, doc: Snap) { return makeInvertible(op, doc, ropeImpl) },
+    stripInvertible,
+    invert, // Only valid to call on operations with invert data.
+
     invertWithDoc(op: TextOp, doc: Snap) { return invert(makeInvertible(op, doc, ropeImpl)) },
   }
 }

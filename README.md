@@ -7,7 +7,7 @@ For documentation on the API spec this type implements, see [ottypes/docs](/otty
 
 There's also compatible versions of this library in [C](https://github.com/ottypes/libot), [rust](https://github.com/josephg/textot.rs) and [swift](https://github.com/josephg/libot-swift).
 
-This type is *almost* identical to the original [text type](https://github.com/ottypes/text). The difference is that text-unicode counts positions based on the number of unicode codepoints instead of javascript string length (UCS2 2-byte offsets). For example, "😭" is a single unicode codepoint but `"😭".length === 2` in javascript. In text, this is 2 characters (which propogates what I consider a bug in javascript). In text-unicode, this is counted as just 1 character. Considering it as 1 character is slightly less performant in javascript, but makes interop with other modern languages much easier.
+This type is *almost* identical to the original [text type](https://github.com/ottypes/text). The difference is that text-unicode counts positions based on the number of unicode codepoints instead of javascript string length (UCS2 2-byte offsets). For example, "😭" is a single unicode codepoint but `"😭".length === 2` in javascript. In text, this is 2 characters (which propogates what I consider a bug in javascript). In text-unicode, this is counted as just 1 character. Considering it as 1 character is slightly less performant in javascript, but makes interop with other languages much easier.
 
 
 ## Usage
@@ -68,6 +68,10 @@ doc = type.apply(doc, [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
 // If your rope functions modify doc in-place, so will apply.
 ```
 
+### Inverting operations
+
+Its often useful to invert an operation to allow for undo support. Invert support in text-unicode has been added but its still experimental. (I might tweak method names and whatnot). See [tracking issue](https://github.com/ottypes/text-unicode/issues/3) for current status on this.
+
 
 ### Transforming cursor positions
 
@@ -119,7 +123,7 @@ You could apply the operation
 [1, ' hi ', 2, {d:3}]
 ```
 
-This operation will skip the first character (1), insert ' hi ', skip 2 more
+This operation will skip (retain) the first character (1), insert ' hi ', skip 2 more
 characters then delete the next 3 characters. The result would be:
 
 ```
@@ -128,12 +132,12 @@ characters then delete the next 3 characters. The result would be:
 
 ### Operations
 
-Operations are lists of components, which move along the document. Each
-component is one of
+Each operation is a list of components. The components describe a traversal of the document, modifying the document along the way. Each component is one of:
 
-- **Number N**: Skip forward *N* characters in the document
+- **Number N**: Skip (retain) the next *N* characters in the document
 - **"str"**: Insert *"str"* at the current position in the document
 - **{d:N}**: Delete *N* characters at the current position in the document
+- **{d:"str"}**: Delete the string *"str"* at the current position in the document. This is functionally identical to *{d:N}* but allows an operation to be inverted, which is useful for undo support.
 
 The operation does not have to skip the last characters in the document.
 
@@ -152,6 +156,7 @@ I have compatible implementations of this OT type in:
 
 - [C](https://github.com/share/libot/blob/master/text.h). This implementation is insanely fast (~20M transforms / second on my old laptop, not that that will ever be a bottleneck.)
 - [Rust](https://github.com/josephg/textot.rs). This code is much less mature, but far more concise and beautiful than the C or JS implementations.
+- [Swift](https://github.com/josephg/libot-swift)
 
 ---
 
@@ -161,11 +166,11 @@ This is the 4th iteration of ShareJS's plaintext type.
 
 
 The [first
-iteration](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee)
-was similar, except it is invertable. Invertability is nice, but I want to
-eventually build an arbitrary P2P OT system, and in a p2p setting
-invertibillity becomes impractical to achieve. I don't want systems to depend
-on it.
+iteration](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee) was
+similar, except it forces all operations to be invertable. Invertability is
+nice, but I want to eventually build an arbitrary P2P OT system, and in a p2p
+setting invertibility becomes impractical to achieve. I don't want systems to
+depend on it.
 
 The second iteration made each component specify a location and an edit there.
 Operations were lists of these edits. Because the components were not sorted,
