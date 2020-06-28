@@ -16,7 +16,7 @@
 // A user can define:
 // - onInsert(pos, text): Called when text is inserted.
 // - onRemove(pos, length): Called when text is removed.
-import {TextOp} from './maketext'
+import {TextOp, dlen} from './type'
 import {strPosToUni} from 'unicount'
 
 export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb: () => {}) => void) {
@@ -58,8 +58,9 @@ export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb
             pos += component.length
             break
           case 'object':
-            if (this.onRemove) this.onRemove(pos, component.d)
-            spos += component.d
+            const dl = dlen(component.d)
+            if (this.onRemove) this.onRemove(pos, dl)
+            spos += dl
         }
       }
     },

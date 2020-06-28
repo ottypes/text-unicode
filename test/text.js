@@ -38,7 +38,7 @@ const transform = function(op1, op2, expectLeft, expectRight) {
 
 describe('text', () => {
   describe('text-transform-tests.json', () => {
-    it('should transform correctly', () => {
+    it('passes saved transform tests', () => {
       const testData = fs.readFileSync(__dirname + '/text-transform-tests.json', 'utf8').split('\n')
 
       while (testData.length >= 4) {
@@ -53,7 +53,7 @@ describe('text', () => {
       }
     })
 
-    it('should compose without crashing', () => {
+    it('composes without crashing', () => {
       const testData = fs.readFileSync(__dirname + '/text-transform-tests.json', 'utf8').split('\n')
 
       while (testData.length >= 4) {
@@ -99,6 +99,13 @@ describe('text', () => {
     normalize(['ab', ''], ['ab'])
     normalize([0, 'a', 0, 'b', 0], ['ab'])
     normalize(['a', 1, 'b'], ['a', 1, 'b'])
+  })
+
+  it('correctly handles deletes with invert data', () => {
+    compose([{d: 'ab'}], [{d: 'cd'}], [{d: 'abcd'}])
+    compose([2, {d: 'cd'}], [{d: 'ab'}], [{d: 'abcd'}])
+    compose([{d: 'ab'}], [{d: 2}], [{d: 4}])
+    compose([{d: 2}], [{d: 'cd'}], [{d: 4}])
   })
 
   describe('emoji', () => {    

@@ -3,32 +3,36 @@
  * This is an OT implementation for text. It is the standard implementation of
  * text used by ShareJS.
  *
- * This type is composable but non-invertable. Its similar to ShareJS's old
- * text-composable type, but its not invertable and its very similar to the
+ * This type is composable and by default non-invertable (operations do not by
+ * default contain enough information to invert them). Its similar to ShareJS's
+ * old text-composable type, but its not invertable and its very similar to the
  * text-tp2 implementation but it doesn't support tombstones or purging.
  *
  * Ops are lists of components which iterate over the document. Components are
- * either: A number N: Skip N characters in the original document "str" :
- * Insert "str" at the current position in the document {d:N} : Delete N
- * characters at the current position in the document
+ * either:
+ *
+ * - A number N: Skip N characters in the original document
+ * - "str": Insert "str" at the current position in the document
+ * - {d:N}: Delete N characters at the current position in the document
+ * - {d:"str"}: Delete "str" at the current position in the document. This is
+ *   equivalent to {d:N} but provides extra information for operation
+ *   invertability.
  *
  * Eg: [3, 'hi', 5, {d:8}]
  *
  * The operation does not have to skip the last characters in the document.
  *
- * Snapshots are strings.
+ * Snapshots are by default strings.
  *
  * Cursors are either a single number (which is the cursor position) or a pair
- * of [anchor, focus] (aka [start, end]). Be aware that end can be before
- * start.
+ * of [anchor, focus] (aka [start, end]). Be aware that end can be before start.
  *
- * The actual string type is configurable. The OG default exposed text type
- * uses raw javascript strings, but they're not compatible with OT
- * implementations in other languages because string.length returns the wrong
- * value for unicode characters that don't fit in 2 bytes. And JS strings are
- * quite an inefficient data structure for manipulating lines & UTF8 offsets.
- * For this reason, you can use your own data structure underneath the text OT
- * code.
+ * The actual string type is configurable. The OG default exposed text type uses
+ * raw javascript strings, but they're not compatible with OT implementations in
+ * other languages because string.length returns the wrong value for unicode
+ * characters that don't fit in 2 bytes. And JS strings are quite an inefficient
+ * data structure for manipulating lines & UTF8 offsets. For this reason, you
+ * can use your own data structure underneath the text OT code.
  *
  * Note that insert operations themselves are always raw strings. Its just
  * snapshots that are configurable.
@@ -36,7 +40,7 @@
 
 import {strPosToUni, uniToStrPos} from 'unicount'
 
-export type TextOpComponent = number | string | {d: number}
+export type TextOpComponent = number | string | {d: number | string}
 export type TextOp = TextOpComponent[]
 
 export interface TextType<R> {
@@ -56,16 +60,20 @@ export interface TextType<R> {
 }
 
 export interface Rope<Snap> {
+  /** Create a snapshot from the given javascript string */
   create(s: string): Snap
+  /** Convert a snapshot into a javascript string */
   toString(doc: Snap): string
+  /** Create or update a document snapshot by walking the document */
   builder(doc: Snap): {
-    // from(doc: Snap): Builder<Snap>
     skip(n: number): void
     append(s: string): void
     del(n: number): void
 
     build(): Snap
   }
+  /** Equivalent to String.slice in javascript, but using UTF8 offsets. */
+  // sliceUTF8(doc: Snap, start: number, end: number): Snap
 }
 
 
@@ -78,8 +86,9 @@ const checkOp = (op: TextOp) => {
     const c = op[i]
     switch (typeof c) {
       case 'object':
-        // The only valid objects are {d:X} for +ive values of X.
-        if (!(typeof c.d === 'number' && c.d > 0)) throw Error('Object components must be deletes of size > 0')
+        // The only valid objects are {d:X} for +ive values of X or non-empty strings.
+        if (typeof c.d !== 'number' && typeof c.d !== 'string') throw Error('Delete must be number or string')
+        if (dlen(c.d) <= 0) throw Error('Deletes must not be empty')
         break
       case 'string':
         // Strings are inserts.
@@ -115,9 +124,11 @@ const checkSelection = (selection: [number, number]) => {
   }
 }
 
+export const dlen = (d: number | string) => typeof d === 'number' ? d : strPosToUni(d)
+
 /** Make a function that appends to the given operation. */
 const makeAppend = (op: TextOp) => (component: TextOpComponent) => {
-  if (!component || (component as any).d === 0) {
+  if (!component || (component as any).d === 0 || (component as any).d === '') {
     // The component is a no-op. Ignore!
 
   } else if (op.length === 0) {
@@ -125,8 +136,14 @@ const makeAppend = (op: TextOp) => (component: TextOpComponent) => {
 
   } else if (typeof component === typeof op[op.length - 1]) {
     if (typeof component === 'object') {
-      // Concatenate deletes
-      (op[op.length - 1] as {d:number}).d += component.d
+      // Concatenate deletes. This is annoying because the op or component could
+      // contain strings or numbers.
+      const last = op[op.length - 1] as {d:number | string}
+      last.d = typeof last.d === 'string' && typeof component.d === 'string'
+        ? last.d + component.d // Preserve invert information
+        : dlen(last.d) + dlen(component.d) // Discard invert information, if any.
+      
+      // (op[op.length - 1] as {d:number}).d += component.d
     } else {
       // Concat strings / inserts. TSC should be smart enough for this :p
       (op[op.length - 1] as any) += (component as any)
@@ -137,10 +154,24 @@ const makeAppend = (op: TextOp) => (component: TextOpComponent) => {
 }
 
 /** Get the length of a component */
-const componentLength = (c: TextOpComponent) => (
+const componentLength = (c: TextOpComponent): number => (
   typeof c === 'number' ? c
     : typeof c === 'string' ? strPosToUni(c)
-    : c.d
+    : typeof c.d === 'number' ? c.d
+    : strPosToUni(c.d)
+)
+
+// Does not support negative numbers.
+const uniSlice = (s: string, startUni: number, endUni?: number) => {
+  const start = uniToStrPos(s, startUni)
+  const end = endUni == null ? Infinity : uniToStrPos(s, endUni)
+  return s.slice(start, end)
+}
+
+const dslice = (d: number | string, start: number, end?: number) => (
+  typeof d === 'number'
+    ? (end == null) ? d - start : Math.min(d, end) - start
+    : uniSlice(d, start, end)
 )
 
 /** Makes and returns utility functions take and peek.
@@ -190,14 +221,25 @@ const makeTake = (op: TextOp) => {
       }
     } else {
       // Delete
-      if (n === -1 || indivisableField === 'd' || c.d - offset <= n) {
-        part = {d: c.d - offset}
+      //
+      // So this is a little weird - the insert case uses UCS2 length offsets
+      // directly instead of counting in codepoints. Thats more efficient, but
+      // more complicated. It only matters for non-invertable ops with huge
+      // deletes being composed / transformed by other very complicated ops.
+      // Probably not common enough to optimize for. Esp since this is a little
+      // bit of a mess anyway, and the tests should iron out any problems.
+      if (n === -1 || indivisableField === 'd' || dlen(c.d) - offset <= n) {
+        // Emit the remainder of the delete.
+        part = {d: dslice(c.d, offset)}
+        // part = {d: dlen(c.d) - offset}
         ++idx
         offset = 0
         return part
       } else {
+        // Slice into the delete content
+        let result = dslice(c.d, offset, offset + n)
         offset += n
-        return {d: n}
+        return {d: result}
       }
     }
   }
@@ -270,7 +312,7 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
         break
 
       case 'object': // Delete
-        length = c2.d
+        length = dlen(c2.d)
         while (length > 0) {
           c1 = take(length, 'i')!
           switch (typeof c1) {
@@ -282,7 +324,7 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
               break
             case 'object':
               // The delete is unnecessary now - the text has already been deleted.
-              length -= c1.d
+              length -= dlen(c1.d)
           }
         }
         break
@@ -307,7 +349,7 @@ function compose(op1: TextOp, op2: TextOp) {
 
   for (let i = 0; i < op2.length; i++) {
     const component = op2[i]
-    let length, chunk
+    let length: number, chunk: TextOpComponent
     switch (typeof component) {
       case 'number': // Skip
         length = component
@@ -325,18 +367,20 @@ function compose(op1: TextOp, op2: TextOp) {
         break
 
       case 'object': // Delete
-        length = component.d
+        length = dlen(component.d) // Length of the delete we're doing
+        let offset = 0 // Offset into our deleted content
 
-        while (length > 0) {
-          chunk = take(length, 'd')!
+        while (offset < length) {
+          chunk = take(length - offset, 'd')!
 
           switch (typeof chunk) {
             case 'number':
-              append({d: chunk})
-              length -= chunk
+              // We're deleting the skipped characters.
+              append({d: dslice(component.d, offset, offset + chunk)})
+              offset += chunk
               break
             case 'string':
-              length -= strPosToUni(chunk)
+              offset += strPosToUni(chunk)
               break
             case 'object':
               append(chunk)
@@ -377,7 +421,7 @@ const transformPosition = (cursor: number, op: TextOp) => {
         break
 
       case 'object': // delete
-        cursor -= Math.min(c.d, cursor - pos)
+        cursor -= Math.min(dlen(c.d), cursor - pos)
         break
     }
   }
@@ -389,6 +433,39 @@ const transformSelection = (selection: number | [number, number], op: TextOp): n
     ? transformPosition(selection, op)
     : selection.map(s => transformPosition(s, op)) as [number, number]
 )
+
+// function invertWithCtx<S, R extends Rope<S>>(op: TextOp, doc: S, ropeImpl: R, preserveInvertData = false) {
+//   // Walk over the rope, turning each insert into an equivalent delete and each
+//   // delete into the equivalent insert based on the contents of the document.
+
+//   const newOp: TextOp = []
+//   let pos = 0 // Position in original document (pre apply).
+//   const append = makeAppend(newOp)
+//   for (let i = 0; i < op.length; i++) {
+//     const c = op[i]
+//     switch (typeof c) {
+//       case 'object': // Delete
+//         if (typeof c.d === 'string') {
+//           append(c.d) // The operation contains information to invert inline.
+//           pos += c.d.length
+//         } else {
+//           append(ropeImpl.toString(ropeImpl.sliceUTF8(doc, pos, pos + c.d)))
+//           pos += c.d
+//         }
+//         break
+
+//       case 'string': // Insert
+//         append({d: preserveInvertData ? c : c.length})
+//         break
+        
+//       case 'number': // Skip
+//         append(c)
+//         pos += c
+//         break
+//     }
+//   }
+//   return trim(newOp)
+// }
 
 
 export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
@@ -424,7 +501,7 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
         switch (typeof component) {
           case 'number': builder.skip(component); break
           case 'string': builder.append(component); break
-          case 'object': builder.del(component.d); break
+          case 'object': builder.del(dlen(component.d)); break
         }
       }
 

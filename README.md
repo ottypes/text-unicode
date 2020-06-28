@@ -5,6 +5,11 @@ markdown.
 
 For documentation on the API spec this type implements, see [ottypes/docs](/ottypes/docs).
 
+There's also compatible versions of this library in [C](https://github.com/ottypes/libot), [rust](https://github.com/josephg/textot.rs) and [swift](https://github.com/josephg/libot-swift).
+
+This type is *almost* identical to the original [text type](https://github.com/ottypes/text). The difference is that text-unicode counts positions based on the number of unicode codepoints instead of javascript string length (UCS2 2-byte offsets). For example, "😭" is a single unicode codepoint but `"😭".length === 2` in javascript. In text, this is 2 characters (which propogates what I consider a bug in javascript). In text-unicode, this is counted as just 1 character. Considering it as 1 character is slightly less performant in javascript, but makes interop with other modern languages much easier.
+
+
 ## Usage
 
 ```
@@ -19,9 +24,9 @@ const {type} = require('ot-text-unicode')
 type.apply('hi there', [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
 ```
 
-### Using a rope with text-ot
+### Using a rope with text-unicode
 
-This library has also been extended to allow you to specify your own fancy rope type, and apply operations efficiently. Neato 🌯! To use it, you'll need to implement your own rope type:
+This library has also been extended to allow you to specify your own fancy rope type, and apply operations efficiently. Neato 🌯! To use it, you'll need to implement your own rope type, or use a rope library on npm:
 
 ```javascript
 const myRopeFns = {

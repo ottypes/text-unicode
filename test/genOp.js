@@ -58,13 +58,16 @@ module.exports = function genOp(docStr) {
     consume(skip)
 
     const length = randomInt(Math.min(docStr.length, 10))
-    op.push({d:length})
+    op.push({d: randomInt(2)
+      ? length
+      : docStr.slice(0, length).join('')
+    })
     return docStr = docStr.slice(length)
   }
 
   while (docStr.length > 0) {
     // If the document is long, we'll bias it toward deletes
-    const chance = initialLen > 100 ? 3 : 2
+    const chance = initialLen > 30 ? 3 : 2
     switch (randomInt(chance)) {
       case 0: addInsert(); break
       case 1: case 2: addDelete(); break
