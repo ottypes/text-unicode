@@ -12,7 +12,7 @@
   },
   "devDependencies": {
     "mocha": "^7.1.2",
-    "ot-fuzzer": "~1.0.0",
+    "ot-fuzzer": "^1.2.1",
     "typescript": "^3.2.1"
   },
   "scripts": {
