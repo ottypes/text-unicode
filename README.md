@@ -24,6 +24,21 @@ const {type} = require('ot-text-unicode')
 type.apply('hi there', [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
 ```
 
+There are helper methods for simple insert and remove operations:
+
+```javascript
+const {type, insert, remove} = require('ot-text-unicode')
+
+const op1 = insert(2, "hi there") // returns [2, "hi there"]
+
+// Operations which delete characters can optionally specify which characters were deleted:
+const op2inv = remove(2, "hi there") // returns [2, {d:"hi there"}]
+const op2noinv = remove(2, 8) // returns [2, {d:8}]
+
+const addThenRemove = type.compose(op1, op2inv) // Returns [], aka no-op!
+```
+
+
 ### Using a rope with text-unicode
 
 This library has also been extended to allow you to specify your own fancy rope type, and apply operations efficiently. Neato 🌯! To use it, you'll need to implement your own rope type, or use a rope library on npm:
@@ -91,6 +106,8 @@ type.invert(op2) // Ok - returns `[2, 'hello']`
 type.invertWithDoc(op1, 'a hello') // Ok - returns `[2, 'hello']`.
 ```
 
+Invertibility information will be preserved through calls to transform and compose, if all provided operations are invertible. Note this is not the case for some other types, like json1.
+
 
 ### Transforming cursor positions
 
@@ -149,7 +166,7 @@ characters then delete the next 3 characters. The result would be:
 "A hi BCG"
 ```
 
-### Operations
+### Operation components
 
 Each operation is a list of components. The components describe a traversal of the document, modifying the document along the way. Each component is one of:
 
@@ -159,6 +176,7 @@ Each operation is a list of components. The components describe a traversal of t
 - **{d:"str"}**: Delete the string *"str"* at the current position in the document. This is functionally identical to *{d:N}* but allows an operation to be inverted, which is useful for undo support.
 
 The operation does not have to skip the last characters in the document.
+
 
 ### Selections
 

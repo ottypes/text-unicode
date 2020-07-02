@@ -574,5 +574,7 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
     invert, // Only valid to call on operations with invert data.
 
     invertWithDoc(op: TextOp, doc: Snap) { return invert(makeInvertible(op, doc, ropeImpl)) },
+
+    isNoop: (op: TextOp) => op.length === 0
   }
 }
