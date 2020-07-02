@@ -88,6 +88,7 @@ describe('text', () => {
     normalize([0], [])
     normalize([''], [])
     normalize([{d:0}], [])
+    normalize([{d:''}], [])
 
     normalize([{d:2}], [{d:2}])
     normalize([1,1], [])

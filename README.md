@@ -1,7 +1,7 @@
 # The Plaintext OT Type, with proper unicode positions
 
 This OT type can be used to edit plaintext documents, like sourcecode or
-markdown.
+markdown. It allows invertible or non-invertible text operations.
 
 For documentation on the API spec this type implements, see [ottypes/docs](/ottypes/docs).
 
@@ -70,7 +70,26 @@ doc = type.apply(doc, [3, {d:5}, '🤖👻💃']) // -> 'hi 🤖👻💃'
 
 ### Inverting operations
 
-Its often useful to invert an operation to allow for undo support. Invert support in text-unicode has been added but its still experimental. (I might tweak method names and whatnot). See [tracking issue](https://github.com/ottypes/text-unicode/issues/3) for current status on this.
+Its often useful to be able to invert an operation to support undo. To invert an operation either:
+
+1. The operation needs to contain a copy of all deleted characters instead of simply specifying how many characters are deleted. Eg, `[{d:'hi'}]` instead of `[{d:2}]`.
+2. Or when inverting an operation you can use `type.invertWithDoc(op, doc)`, providing a copy of what the document looked like *before* the operation was applied.
+
+Note invert support has been added recently, and may not be supported by text-unicode implementations in other languages.
+
+```javascript
+const {type} = require('ot-text-unicode')
+
+const op1 = [2, {d: 5}] // Delete 5 characters at position 2
+type.invert(op1) // ERROR: Will throw because the operation doesn't contain deleted characters
+
+// Option 1: add all deleted characters into the operation:
+const op2 = [2, {d: 'hello'}] // Delete 5 characters ('hello') at position 2
+type.invert(op2) // Ok - returns `[2, 'hello']`
+
+// Option 2: Use invertWithDoc to generate an operation's inverse
+type.invertWithDoc(op1, 'a hello') // Ok - returns `[2, 'hello']`.
+```
 
 
 ### Transforming cursor positions

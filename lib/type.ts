@@ -40,6 +40,8 @@
 
 import {strPosToUni, uniToStrPos} from 'unicount'
 
+const debugMode = false
+
 export type TextOpComponent = number | string | {d: number | string}
 export type TextOp = TextOpComponent[]
 
@@ -110,13 +112,44 @@ const checkOp = (op: TextOp) => {
   if (typeof last === 'number') throw Error('Op has a trailing skip')
 }
 
-const normalize = (op: TextOp) => {
+// TODO: Consider exposing this at the library level.
+// TODO: Also consider rewriting this to use es iterators instead of callback-passing style.
+export function eachOp(op: TextOp, fn: (c: TextOpComponent, prePos: number, postPos: number) => void) {
+  let prePos = 0, postPos = 0
+
+  for (let i = 0; i < op.length; i++) {
+    const c = op[i]
+    fn(c, prePos, postPos)
+    switch (typeof c) {
+      case 'object': // Delete
+        prePos += dlen(c.d)
+        break
+
+      case 'string': // Insert
+        postPos += strPosToUni(c)
+        break
+        
+      case 'number': // Skip
+        prePos += c
+        postPos += c
+        break
+    }
+  }
+}
+
+function mapOp(op: TextOp, fn: (c: TextOpComponent, prePos: number, postPos: number) => TextOpComponent): TextOp {
   const newOp: TextOp = []
   const append = makeAppend(newOp)
-  for (let i = 0; i < op.length; i++) append(op[i])
+  eachOp(op, (c, prePos, postPos) => {
+    append(fn(c, prePos, postPos))
+  })
   return trim(newOp)
 }
 
+const id = <T>(x: T) => x
+const normalize = (op: TextOp) => {
+  return mapOp(op, id)
+}
 
 /** Check that the given selection range is valid. */
 const checkSelection = (selection: [number, number]) => {
@@ -339,6 +372,10 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
   let c
   while ((c = take(-1))) append(c)
   
+  if (debugMode && isInvertible(op1) && isInvertible(op2) && !isInvertible(newOp)) {
+    throw Error('Internal error - composed operation should also be invertible')
+  }
+
   return trim(newOp)
 }
 
@@ -397,6 +434,10 @@ function compose(op1: TextOp, op2: TextOp) {
   let c
   while ((c = take(-1))) append(c)
 
+  if (debugMode && isInvertible(op1) && isInvertible(op2) && !isInvertible(result)) {
+    throw Error('Internal error - composed operation should also be invertible')
+  }
+
   return trim(result)
 }
 
@@ -439,40 +480,15 @@ const transformSelection = (selection: number | [number, number], op: TextOp): n
 )
 
 
-function mapOp(op: TextOp, fn: (c: TextOpComponent, prePos: number, postPos: number) => TextOpComponent): TextOp {
-  const newOp: TextOp = []
-  const append = makeAppend(newOp)
-  let prePos = 0, postPos = 0
-
-  for (let i = 0; i < op.length; i++) {
-    const c = op[i]
-    append(fn(c, prePos, postPos))
-    switch (typeof c) {
-      case 'object': // Delete
-        prePos += dlen(c.d)
-        break
-
-      case 'string': // Insert
-        postPos += strPosToUni(c)
-        break
-        
-      case 'number': // Skip
-        prePos += c
-        postPos += c
-        break
-    }
-  }
-  return trim(newOp)
-}
-
 function makeInvertible<S, R extends Rope<S>>(op: TextOp, doc: S, ropeImpl: R) {
-  return mapOp(op, (c, prePos) => {
-    if (typeof c === 'object' && typeof c.d === 'number') { // Delete
-      return {d: ropeImpl.slice(doc, prePos, prePos + c.d)}
-    } else return c
-  })
+  return mapOp(op, (c, prePos) => (
+    (typeof c === 'object' && typeof c.d === 'number') // Delete
+      ? {d: ropeImpl.slice(doc, prePos, prePos + c.d)}
+      : c
+  ))
 }
 
+/** Attempt to invert the operation. Operations with {d:N} components cannot be inverted, and this method will throw. */
 function invert(op: TextOp) {
   return mapOp(op, c => {
     switch (typeof c) {
@@ -487,12 +503,22 @@ function invert(op: TextOp) {
   })
 }
 
+/** Strip extraneous invertibility information from the operation */
 function stripInvertible(op: TextOp) {
-  return mapOp(op, c => {
-    if (typeof c === 'object' && typeof c.d === 'string') {
-      return {d: strPosToUni(c.d)}
-    } else return c
+  return mapOp(op, c => (
+    (typeof c === 'object' && typeof c.d === 'string')
+      ? {d: strPosToUni(c.d)}
+      : c
+  ))
+}
+
+/** Helper method. returns true if the operation can be successfully inverted. */
+function isInvertible(op: TextOp): boolean {
+  let invertible = true
+  eachOp(op, c => {
+    if (typeof c === 'object' && typeof c.d === 'number') invertible = false
   })
+  return invertible
 }
 
 
@@ -542,6 +568,7 @@ export default function makeType<Snap>(ropeImpl: Rope<Snap>): TextType<Snap> {
     transformPosition,
     transformSelection,
 
+    isInvertible,
     makeInvertible(op: TextOp, doc: Snap) { return makeInvertible(op, doc, ropeImpl) },
     stripInvertible,
     invert, // Only valid to call on operations with invert data.

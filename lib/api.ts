@@ -16,7 +16,7 @@
 // A user can define:
 // - onInsert(pos, text): Called when text is inserted.
 // - onRemove(pos, length): Called when text is removed.
-import {TextOp, dlen} from './type'
+import {TextOp, dlen, eachOp} from './type'
 import {strPosToUni} from 'unicount'
 
 export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb: () => {}) => void) {
@@ -33,9 +33,9 @@ export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb
       return submitOp([uniPos, text], callback)
     },
 
-    remove(pos: number, length: number, callback: () => {}) {
+    remove(pos: number, lengthOrContent: number | string, callback: () => {}) {
       const uniPos = strPosToUni(getSnapshot(), pos)
-      return submitOp([uniPos, {d:length}], callback)
+      return submitOp([uniPos, {d:lengthOrContent}], callback)
     },
 
     // When you use this API, you should implement these two methods
@@ -44,25 +44,16 @@ export default function api(getSnapshot: () => string, submitOp: (op: TextOp, cb
     //onRemove: function(pos, removedLength) {},
 
     _onOp(op: TextOp) {
-      var pos = 0
-      var spos = 0
-      for (var i = 0; i < op.length; i++) {
-        var component = op[i]
+      eachOp(op, (component, prePos, postPos) => {
         switch (typeof component) {
-          case 'number':
-            pos += component
-            spos += component
-            break
           case 'string':
-            if (this.onInsert) this.onInsert(pos, component)
-            pos += component.length
+            if (this.onInsert) this.onInsert(postPos, component)
             break
           case 'object':
             const dl = dlen(component.d)
-            if (this.onRemove) this.onRemove(pos, dl)
-            spos += dl
+            if (this.onRemove) this.onRemove(postPos, dl)
         }
-      }
+      })
     },
 
     onInsert: null as null | ((pos: number, s: string) => void),
