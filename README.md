@@ -38,6 +38,7 @@ const op2noinv = remove(2, 8) // returns [2, {d:8}]
 const addThenRemove = type.compose(op1, op2inv) // Returns [], aka no-op!
 ```
 
+> **Compose warning:** Sadly, the compose function is not closed under transform. If you compose a bunch of changes together then transform using that, your code will be subtly buggy. See [NOTES](NOTES.md) for way more details on this unfortunate quirk!
 
 ### Using a rope with text-unicode
 
@@ -197,10 +198,9 @@ I have compatible implementations of this OT type in:
 
 ---
 
-# Commentary
+# History
 
 This is the 4th iteration of ShareJS's plaintext type.
-
 
 The [first
 iteration](https://github.com/share/ShareJS/blob/0.6/src/types/text2.coffee) was
