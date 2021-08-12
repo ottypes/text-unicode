@@ -191,21 +191,26 @@ const makeAppend = (op: TextOp) => (component: TextOpComponent) => {
 }
 
 /** Get the length of a component */
-const componentLength = (c: TextOpComponent): number => (
+const componentPreLength = (c: TextOpComponent): number => (
+  typeof c === 'number' ? c
+    : typeof c === 'string' ? 0
+    : typeof c.d === 'number' ? c.d : strPosToUni(c.d)
+)
+
+const componentPostLength = (c: TextOpComponent): number => (
   typeof c === 'number' ? c
     : typeof c === 'string' ? strPosToUni(c)
-    : typeof c.d === 'number' ? c.d
-    : strPosToUni(c.d)
+    : 0
 )
 
 // Does not support negative numbers.
-export const uniSlice = (s: string, startUni: number, endUni?: number) => {
+export const uniSlice = (s: string, startUni: number, endUni?: number): string => {
   const start = uniToStrPos(s, startUni)
   const end = endUni == null ? Infinity : uniToStrPos(s, endUni)
   return s.slice(start, end)
 }
 
-const dslice = (d: number | string, start: number, end?: number) => (
+const dslice = (d: number | string, start: number, end?: number): string | number => (
   typeof d === 'number'
     ? (end == null) ? d - start : Math.min(d, end) - start
     : uniSlice(d, start, end)
@@ -213,7 +218,7 @@ const dslice = (d: number | string, start: number, end?: number) => (
 
 /** Makes and returns utility functions take and peek.
  */
-const makeTake = (op: TextOp) => {
+const makeTake = (op: TextOp, isPre: boolean) => {
   // TODO: Rewrite this by passing a context, like the rust code does. Its cleaner that way.
 
   // The index of the next component to take
@@ -225,11 +230,12 @@ const makeTake = (op: TextOp) => {
   // Take up to length n from the front of op. If n is -1, take the entire next
   // op component. If indivisableField == 'd', delete components won't be separated.
   // If indivisableField == 'i', insert components won't be separated.
-  const take = (n: number, indivisableField?: 'i' | 'd'): TextOpComponent | null => {
+  const take = (n: number): TextOpComponent | null => {
     // We're at the end of the operation. The op has skips, forever. Infinity
     // might make more sense than null here.
     if (idx === op.length) return n === -1 ? null : n
 
+    // TODO: Tidy this up using pre / post component length methods.
     const c = op[idx]
     let part
     if (typeof c === 'number') {
@@ -245,7 +251,7 @@ const makeTake = (op: TextOp) => {
       }
     } else if (typeof c === 'string') {
       // Insert
-      if (n === -1 || indivisableField === 'i' || strPosToUni(c.slice(offset)) <= n) {
+      if (n === -1 || isPre || strPosToUni(c.slice(offset)) <= n) {
         part = c.slice(offset)
         ++idx
         offset = 0
@@ -265,7 +271,7 @@ const makeTake = (op: TextOp) => {
       // deletes being composed / transformed by other very complicated ops.
       // Probably not common enough to optimize for. Esp since this is a little
       // bit of a mess anyway, and the tests should iron out any problems.
-      if (n === -1 || indivisableField === 'd' || dlen(c.d) - offset <= n) {
+      if (n === -1 || !isPre || dlen(c.d) - offset <= n) {
         // Emit the remainder of the delete.
         part = {d: dslice(c.d, offset)}
         // part = {d: dlen(c.d) - offset}
@@ -286,7 +292,6 @@ const makeTake = (op: TextOp) => {
 
   return {take, peek}
 }
-
 
 
 /** Trim any excess skips from the end of an operation.
@@ -318,7 +323,7 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
   const newOp: TextOp = []
 
   const append = makeAppend(newOp)
-  const {take, peek} = makeTake(op1)
+  const {take, peek} = makeTake(op1, true)
 
   for (let i = 0; i < op2.length; i++) {
     const c2 = op2[i]
@@ -328,10 +333,10 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
       case 'number': // Skip
         length = c2
         while (length > 0) {
-          c1 = take(length, 'i')!
+          c1 = take(length)!
           append(c1)
           if (typeof c1 !== 'string') {
-            length -= componentLength(c1)
+            length -= componentPreLength(c1)
           }
         }
         break
@@ -351,7 +356,7 @@ function transform(op1: TextOp, op2: TextOp, side: 'left' | 'right') {
       case 'object': // Delete
         length = dlen(c2.d)
         while (length > 0) {
-          c1 = take(length, 'i')!
+          c1 = take(length)!
           switch (typeof c1) {
             case 'number':
               length -= c1
@@ -386,33 +391,35 @@ function compose(op1: TextOp, op2: TextOp) {
 
   const result: TextOp = []
   const append = makeAppend(result)
-  const {take} = makeTake(op1)
+  const {take} = makeTake(op1, false)
 
   for (let i = 0; i < op2.length; i++) {
     const component = op2[i]
     let length: number, chunk: TextOpComponent
     switch (typeof component) {
-      case 'number': // Skip
+      case 'number': { // Skip
         length = component
         while (length > 0) {
-          chunk = take(length, 'd')!
+          chunk = take(length)!
           append(chunk)
           if (typeof chunk !== 'object') {
-            length -= componentLength(chunk)
+            length -= componentPostLength(chunk)
           }
         }
         break
+      }
 
-      case 'string': // Insert
+      case 'string': { // Insert
         append(component)
         break
+      }
 
-      case 'object': // Delete
+      case 'object': { // Delete
         length = dlen(component.d) // Length of the delete we're doing
         let offset = 0 // Offset into our deleted content
 
         while (offset < length) {
-          chunk = take(length - offset, 'd')!
+          chunk = take(length - offset)!
 
           switch (typeof chunk) {
             case 'number':
@@ -428,6 +435,7 @@ function compose(op1: TextOp, op2: TextOp) {
           }
         }
         break
+      }
     }
   }
 
